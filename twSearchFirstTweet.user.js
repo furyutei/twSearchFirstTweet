@@ -2,7 +2,7 @@
 // @name            twSearchFirstTweet
 // @namespace       http://d.hatena.ne.jp/furyu-tei
 // @author          furyu
-// @version         0.1.0.2
+// @version         0.1.0.3
 // @include         http://twitter.com/*
 // @include         https://twitter.com/*
 // @description     search the first tweet on Twitter
@@ -16,7 +16,7 @@ Copyright (c) 2014 furyu <furyutei@gmail.com>
 
 var main = function(w, d){
     var DEBUG = false;
-    var TERMINATE_SEARCH_THRESHOLD = 5;
+    var TERMINATE_SEARCH_THRESHOLD = 1;
     
     var log = function(object) {
         if (!DEBUG) return;
