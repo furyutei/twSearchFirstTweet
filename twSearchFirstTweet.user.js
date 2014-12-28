@@ -2,7 +2,7 @@
 // @name            twSearchFirstTweet
 // @namespace       http://d.hatena.ne.jp/furyu-tei
 // @author          furyu
-// @version         0.1.0.1
+// @version         0.1.0.2
 // @include         http://twitter.com/*
 // @include         https://twitter.com/*
 // @description     search the first tweet on Twitter
@@ -15,7 +15,8 @@ Copyright (c) 2014 furyu <furyutei@gmail.com>
 (function(w, d){
 
 var main = function(w, d){
-    var DEBUG = true;
+    var DEBUG = false;
+    var TERMINATE_SEARCH_THRESHOLD = 5;
     
     var log = function(object) {
         if (!DEBUG) return;
@@ -119,12 +120,14 @@ var main = function(w, d){
             counter++;
             log('*** callback(): count=' + counter);
             var tweets = get_tweets(html);
-            if (tweets.length == 1) {
-                var since = get_date_from_ms(tweets[0].data_time_ms), until = date_shift(since, 1);
-                finish({since: since, until: until, search_url: get_search_url(search_words, since, until)}, tweets);
-                return;
+            if (tweets.length <= 0) {
+                if (!period_info || target_period !== period_info.first_half) {
+                    finish({since: null, until: null, search_url: get_search_url(search_words)}, []);
+                    return;
+                }
+                target_period = period_info.second_half;
             }
-            else if (0 < tweets.length) {
+            else if (TERMINATE_SEARCH_THRESHOLD < tweets.length) {
                 period_info = divide_period(target_period.since, target_period.until);
                 if (period_info.first_half.until.getTime() <= period_info.first_half.since.getTime()) {
                     finish(target_period, tweets);
@@ -133,17 +136,17 @@ var main = function(w, d){
                 target_period = period_info.first_half;
             }
             else {
-                if (!period_info || target_period !== period_info.first_half) {
-                    finish({since: null, until: null, search_url: get_search_url(search_words)}, []);
-                    return;
-                }
-                target_period = period_info.second_half;
+                //finish(target_period, tweets);
+                var since = get_date_from_ms(tweets[tweets.length-1].data_time_ms), until = date_shift(since, 1);
+                finish({since: since, until: until, search_url: get_search_url(search_words, since, until)}, [tweets[tweets.length-1]]);
+                return;
             }
             do_search(search_words, target_period, callback);
         };
         do_search(search_words, target_period, callback);
         
     };  //  end of search_first_tweet()
+    
     var add_search_button = function(){
         var jq_search_button = $('<li id="'+ NAME_SCRIPT + '_button"><a class="js-nav js-tooltip" href="#" data-placement="bottom" title="search for first tweet based on keywords" style="color:navy;"><span class="Icon Icon--search Icon--large"></span><span class="text"></span></a></li>');
         var jq_link = jq_search_button.find('a');
@@ -169,7 +172,9 @@ var main = function(w, d){
                     var tweet_html = '<p>Not found</p>';
                 }
                 cdoc.open();
-                cdoc.write(html.replace(/#TITLE#/g, 'Result').replace(/#HEADER#/g, '<a href="' + info.search_url + '" style="text-decoration:none;">Search Result</a>').replace(/#BODY#/g, tweet_html));
+                //var search_url = info.search_url;
+                var search_url = get_search_url(search_words, null, info.until);
+                cdoc.write(html.replace(/#TITLE#/g, 'Result').replace(/#HEADER#/g, '<a href="' + search_url + '" style="text-decoration:none;">Search Result</a>').replace(/#BODY#/g, tweet_html));
                 cdoc.close();
             });
             return false;
