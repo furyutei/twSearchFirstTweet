@@ -2,7 +2,7 @@
 // @name            twSearchFirstTweet
 // @namespace       http://d.hatena.ne.jp/furyu-tei
 // @author          furyu
-// @version         0.1.0.0
+// @version         0.1.0.1
 // @include         http://twitter.com/*
 // @include         https://twitter.com/*
 // @description     search the first tweet on Twitter
@@ -145,7 +145,7 @@ var main = function(w, d){
         
     };  //  end of search_first_tweet()
     var add_search_button = function(){
-        var jq_search_button = $('<li><a class="js-nav js-tooltip" href="#" data-placement="bottom" title="search for first tweet based on keywords" style="color:navy;"><span class="Icon Icon--search Icon--large"></span><span class="text"></span></a></li>');
+        var jq_search_button = $('<li id="'+ NAME_SCRIPT + '_button"><a class="js-nav js-tooltip" href="#" data-placement="bottom" title="search for first tweet based on keywords" style="color:navy;"><span class="Icon Icon--search Icon--large"></span><span class="text"></span></a></li>');
         var jq_link = jq_search_button.find('a');
         jq_link.click(function(){
             var search_words = $('input#search-query').val() || String(d.getSelection());

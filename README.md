@@ -35,5 +35,6 @@ Twitter上でキーワードを含む最初のツイートを検索
 
 ■ 関連記事
 ---
+- [【twSearchFirstTweet】Twitterでキーワードを含む最初のツイートを検索するユーザースクリプトを試作 - 風柳メモ](http://d.hatena.ne.jp/furyu-tei/20141228/1419741796)  
 - [Twitterからのクリスマスプレゼントが酷かった件 - 風柳メモ](http://d.hatena.ne.jp/furyu-tei/20141226/1419588150)  
 - [Google ChromeへのTampermonkeyのインストールと基本的な使い方 - 風柳メモ](http://d.hatena.ne.jp/furyu-tei/20141227/1419609930)  
