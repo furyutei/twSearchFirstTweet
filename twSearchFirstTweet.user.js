@@ -2,7 +2,7 @@
 // @name            twSearchFirstTweet
 // @namespace       http://d.hatena.ne.jp/furyu-tei
 // @author          furyu
-// @version         0.1.0.4
+// @version         0.1.0.5
 // @include         http://twitter.com/*
 // @include         https://twitter.com/*
 // @description     search the first tweet on Twitter
@@ -10,6 +10,7 @@
 /*
 The MIT License (MIT)
 Copyright (c) 2014 furyu <furyutei@gmail.com>
+https://github.com/furyutei/twSearchFirstTweet
 */
 
 (function(w, d){
@@ -23,14 +24,16 @@ var main = function(w, d){
         console.error('['+new Date().toISOString()+']', object);
     };
     
-    var NAME_SCRIPT = 'twSearchFirstTweet';
-    var $=w.$;
-    if (w[NAME_SCRIPT+'_touched']) return;
-    if (!$) {
-        var main = arguments.callee; setTimeout(function(){main(w,d);}, 100); return;
-    }
+    var NAME_SCRIPT = 'twSearchFirstTweet'; if (w[NAME_SCRIPT+'_touched']) return;
+    var $=w.$; if (!$) {var main = arguments.callee; setTimeout(function(){main(w,d);}, 100); return;}
     log('*** '+  NAME_SCRIPT +' start');
     w[NAME_SCRIPT+'_touched'] = true;
+    
+    var get_selected_text = function(){
+        if (w.getSelection) return w.getSelection().toString();
+        if (d.selection && d.selection.type != 'Control') return d.selection.createRange().text;
+        return '';
+    };
     
     var get_date_from_ms = function(ms) {
         var date = new Date();
@@ -151,7 +154,7 @@ var main = function(w, d){
         var jq_search_button = $('<li id="'+ NAME_SCRIPT + '_button"><a class="js-nav js-tooltip" href="#" data-placement="bottom" title="search for first tweet based on keywords" style="color:navy;"><span class="Icon Icon--search Icon--large"></span><span class="text"></span></a></li>');
         var jq_link = jq_search_button.find('a');
         jq_link.click(function(){
-            var search_words = String(d.getSelection()) || $('input#search-query').val();
+            var search_words = get_selected_text() || $('input#search-query').val();
             if (!search_words) return false;
             
             var cwin = w.open('about:blank'), cdoc = cwin.document;

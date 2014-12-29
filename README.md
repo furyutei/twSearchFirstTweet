@@ -1,6 +1,6 @@
 twSearchFirstTweet
 ==================
-Twitter上でキーワードを含む最初のツイートを検索
+Twitter上でキーワードを含む最初のツイートを検索するユーザースクリプト
 - License: The MIT license  
 - Copyright (c) 2014 風柳(furyu)  
 - 対象ブラウザ： Firefox（[Greasemonkey](https://addons.mozilla.org/ja/firefox/addon/greasemonkey/)が必要）、Google Chrome（[Tampermonkey](https://chrome.google.com/webstore/detail/tampermonkey/dhdgffkkebhmkfjojejmpbldmpobfkfo?hl=ja)が必要）
