@@ -2,9 +2,10 @@
 // @name            twSearchFirstTweet
 // @namespace       http://d.hatena.ne.jp/furyu-tei
 // @author          furyu
-// @version         0.1.0.5
+// @version         0.1.0.6
 // @include         http://twitter.com/*
 // @include         https://twitter.com/*
+// @exclude         https://twitter.com/i/*
 // @description     search the first tweet on Twitter
 // ==/UserScript==
 /*
@@ -59,8 +60,8 @@ var main = function(w, d){
     var divide_period = function(since, until) {
         var first_since = since = round_date(since);
         var second_until = until = round_date(until);
-        first_until = get_date_from_ms((first_since.getTime()+second_until.getTime())/2);
-        second_since = first_until = round_date(first_until);
+        var first_until = get_date_from_ms((first_since.getTime()+second_until.getTime())/2);
+        var second_since = first_until = round_date(first_until);
         return {
             first_half: {
                 since: first_since
