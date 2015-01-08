@@ -2,10 +2,9 @@
 // @name            twSearchFirstTweet
 // @namespace       http://d.hatena.ne.jp/furyu-tei
 // @author          furyu
-// @version         0.1.0.6
+// @version         0.1.0.7
 // @include         http://twitter.com/*
 // @include         https://twitter.com/*
-// @exclude         https://twitter.com/i/*
 // @description     search the first tweet on Twitter
 // ==/UserScript==
 /*
@@ -16,17 +15,19 @@ https://github.com/furyutei/twSearchFirstTweet
 
 (function(w, d){
 
+if (w !== w.parent) return;
+
 var main = function(w, d){
     var DEBUG = false;
     var TERMINATE_SEARCH_THRESHOLD = 1;
     
-    var log = function(object) {
+    var log = function(object){
         if (!DEBUG) return;
         console.error('['+new Date().toISOString()+']', object);
     };
     
     var NAME_SCRIPT = 'twSearchFirstTweet'; if (w[NAME_SCRIPT+'_touched']) return;
-    var $=w.$; if (!$) {var main = arguments.callee; setTimeout(function(){main(w,d);}, 100); return;}
+    var $=w.$; if (!$) {var main = arguments.callee; setTimeout(function(){main(w, d);}, 100); return;}
     log('*** '+  NAME_SCRIPT +' start');
     w[NAME_SCRIPT+'_touched'] = true;
     
@@ -36,28 +37,28 @@ var main = function(w, d){
         return '';
     };
     
-    var get_date_from_ms = function(ms) {
+    var get_date_from_ms = function(ms){
         var date = new Date();
         date.setTime(ms);
         return date;
     };  //  end of get_date_from_ms()
     
-    var round_date_string = function(date) {
+    var round_date_string = function(date){
         if (!(date instanceof Date)) date = new Date(date);
         return date.toISOString().replace(/\..*$/,'.000Z');
     };  //  end of round_date_string()
     
-    var round_date = function(date) {
+    var round_date = function(date){
         return new Date(round_date_string(date));
     };
     
-    var date_shift = function(date, seconds) {
+    var date_shift = function(date, seconds){
         date = round_date(date);
         date.setSeconds(date.getSeconds()+seconds);
         return date;
     };  //  end of date_shift()
     
-    var divide_period = function(since, until) {
+    var divide_period = function(since, until){
         var first_since = since = round_date(since);
         var second_until = until = round_date(until);
         var first_until = get_date_from_ms((first_since.getTime()+second_until.getTime())/2);
@@ -74,12 +75,12 @@ var main = function(w, d){
         };
     };  //  end of divide_period()
     
-    var get_query_date_string = function(date) {
+    var get_query_date_string = function(date){
         if (!(date instanceof Date)) date = new Date(date);
         return date.toISOString().replace(/T([^.]+)\..*$/, '_$1_UTC');
     };  //  end of get_date_string_for_search()
     
-    var get_search_url = function(search_words, since, until) {
+    var get_search_url = function(search_words, since, until){
         search_words = (' '+search_words+' ').replace(/\s(?:since|until):[^\s]+/g, ' ').replace(/(^\s+|\s+$)/g, '');
         var query = search_words;
         if (since) query += ' since:' + get_query_date_string(since);
@@ -89,14 +90,14 @@ var main = function(w, d){
         return url;
     };  //  end of get_search_url()
     
-    var do_search = function(search_words, target_period, callback) {
+    var do_search = function(search_words, target_period, callback){
         var search_url = get_search_url(search_words, target_period.since, target_period.until);
         target_period.search_url = search_url;
         $.get(search_url, callback, 'html');
         return search_url;
     };  //  end of do_search()
     
-    var get_tweets = function(html) {
+    var get_tweets = function(html){
         var links = html.match(/<a[^>]+class="[^"]*tweet-timestamp[\s\S]*?<\/a>/g);
         if (!links) links = [];
         var tweets = [];
@@ -113,14 +114,14 @@ var main = function(w, d){
         return tweets;
     };  //  end of get_tweets()
     
-    var search_first_tweet = function(search_words, finish, debug) {
+    var search_first_tweet = function(search_words, finish, debug){
         if (debug) DEBUG = true;
         var since = new Date('2006-03-01T00:00:00.000Z'), until = date_shift(new Date(), 1);
         //var period_info = divide_period(since, until), target_period = period_info.first_half;
         var period_info = null, target_period = {since: since, until: until};
         
         var counter = 0;
-        var callback = function(html) {
+        var callback = function(html){
             counter++;
             log('*** callback(): count=' + counter);
             var tweets = get_tweets(html);
