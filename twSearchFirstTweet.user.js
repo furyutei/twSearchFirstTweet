@@ -2,7 +2,7 @@
 // @name            twSearchFirstTweet
 // @namespace       http://d.hatena.ne.jp/furyu-tei
 // @author          furyu
-// @version         0.1.0.7
+// @version         0.1.0.8
 // @include         http://twitter.com/*
 // @include         https://twitter.com/*
 // @description     search the first tweet on Twitter
@@ -197,7 +197,10 @@ if (typeof w.$ == 'function') {
 }
 else {
     var container = d.documentElement;
+    var scripts = d.querySelectorAll('script[nonce]');
+    var nonce = (0 < scripts.length) ? scripts[0].getAttribute('nonce') : null;
     var script = d.createElement('script');
+    if (nonce) {script.setAttribute('nonce', nonce);}
     script.textContent = '('+main.toString()+')(window, document);';
     container.appendChild(script);
 }
