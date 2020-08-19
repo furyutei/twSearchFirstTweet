@@ -1,210 +1,337 @@
 // ==UserScript==
-// @name            twSearchFirstTweet
-// @namespace       http://d.hatena.ne.jp/furyu-tei
+// @name            Search the first tweet
+// @name:ja         最初のツイート検索
+// @namespace       https://furyutei.work
+// @license         MIT
+// @version         0.2.0
+// @description     Search the first tweet related to a specific keyword in search timeline of Twitter
+// @description:ja  Twitterの検索タイムラインにおいて指定したキーワードに関する最初のツイートを検索
 // @author          furyu
-// @version         0.1.0.8
-// @include         http://twitter.com/*
-// @include         https://twitter.com/*
-// @description     search the first tweet on Twitter
+// @match           https://twitter.com/*
+// @match           https://mobile.twitter.com/*
+// @grant           none
+// @require         http://furyutei.github.io/twSearchFirstTweet/src/js/timeline.js
+// @compatible      chrome
+// @compatible      firefox
+// @supportURL      https://github.com/furyutei/twSearchFirstTweet/issues
+// @contributionURL https://memo.furyutei.work/about#%E6%B0%97%E3%81%AB%E5%85%A5%E3%81%A3%E3%81%9F%E5%BD%B9%E3%81%AB%E7%AB%8B%E3%81%A3%E3%81%9F%E3%81%AE%E3%81%8A%E6%B0%97%E6%8C%81%E3%81%A1%E3%81%AF%E3%82%AE%E3%83%95%E3%83%88%E5%88%B8%E3%81%A7
 // ==/UserScript==
-/*
-The MIT License (MIT)
-Copyright (c) 2014 furyu <furyutei@gmail.com>
-https://github.com/furyutei/twSearchFirstTweet
-*/
 
-(function(w, d){
+( async () => {
+'use strict';
 
-if (w !== w.parent) return;
-
-var main = function(w, d){
-    var DEBUG = false;
-    var TERMINATE_SEARCH_THRESHOLD = 1;
+const
+    SCRIPT_NAME = 'twSearchFirstTweet',
+    DEBUG = false,
     
-    var log = function(object){
-        if (!DEBUG) return;
-        console.error('['+new Date().toISOString()+']', object);
-    };
+    SEARCH_BUTTON_CLASS = SCRIPT_NAME + '-search-button',
+    CSS_STYLE_CLASS = SCRIPT_NAME + '-css-rule',
     
-    var NAME_SCRIPT = 'twSearchFirstTweet'; if (w[NAME_SCRIPT+'_touched']) return;
-    var $=w.$; if (!$) {var main = arguments.callee; setTimeout(function(){main(w, d);}, 100); return;}
-    log('*** '+  NAME_SCRIPT +' start');
-    w[NAME_SCRIPT+'_touched'] = true;
+    ENABLE_NEW_WINDOW_OPEN = false, // TODO: 検索後に新しいウィンドウを開こうとするとポップアップブロックに引っかかってしまう
     
-    var get_selected_text = function(){
-        if (w.getSelection) return w.getSelection().toString();
-        if (d.selection && d.selection.type != 'Control') return d.selection.createRange().text;
-        return '';
-    };
+    TwitterTimeline = ( ( TwitterTimeline ) => {
+        TwitterTimeline.debug_mode = DEBUG;
+        TwitterTimeline.logged_script_name = SCRIPT_NAME;
+        TwitterTimeline.TWITTER_API.API_DEFINITIONS[ TwitterTimeline.TIMELINE_TYPE.search ].min_delay_ms = 1; // デフォルトではディレイが入るのでこれを無効化
+        return TwitterTimeline;
+    } )( window.TwitterTimeline ),
     
-    var get_date_from_ms = function(ms){
-        var date = new Date();
-        date.setTime(ms);
-        return date;
-    };  //  end of get_date_from_ms()
+    {
+        log_debug,
+        log,
+        log_info,
+        log_error,
+        TWITTER_API,
+        TIMELINE_TYPE,
+        CLASS_TIMELINE_SET,
+    } = TwitterTimeline,
     
-    var round_date_string = function(date){
-        if (!(date instanceof Date)) date = new Date(date);
-        return date.toISOString().replace(/\..*$/,'.000Z');
-    };  //  end of round_date_string()
+    ClassSearchTimeline = CLASS_TIMELINE_SET[ TIMELINE_TYPE.search ],
     
-    var round_date = function(date){
-        return new Date(round_date_string(date));
-    };
+    SEARCH_BUTTON_HELP_TEXT = 'Search for the first tweet that contains a given keyword',
+    SEARCHING_HELP_TEXT = 'Searching ...',
     
-    var date_shift = function(date, seconds){
-        date = round_date(date);
-        date.setSeconds(date.getSeconds()+seconds);
-        return date;
-    };  //  end of date_shift()
+    search_button_icon_svg = '<svg version="1.1" viewBox="0 0 96 96" xmlns="http://www.w3.org/2000/svg"><g transform="translate(0 -271.6)"><g transform="matrix(1.0127 0 0 .94178 5.2473 -23.213)" aria-label="1" fill="currentColor"><path d="m60.319 382.71h-36.204v-6.2296h14.175v-46.768h-14.175v-5.5074q8.3062-0.0451 11.872-2.3474 3.5663-2.3474 4.0177-7.4034h6.4102v62.026h13.904z"/></g><g fill="currentColor"><path d="m40.125 291.81a32.75 32.75 0 0 0-24.875 31.789 32.75 32.75 0 0 0 32.75 32.75 32.75 32.75 0 0 0 32.75-32.75 32.75 32.75 0 0 0-24.875-31.789v11.859a21 21.5 0 0 1 13.125 19.93 21 21.5 0 0 1-0.9082 6.25h2.9961v8.75h-8.0449a21 21.5 0 0 1-15.043 6.5 21 21.5 0 0 1-15.043-6.5h-8.0449v-8.75h2.9941a21 21.5 0 0 1-0.90625-6.25 21 21.5 0 0 1 13.125-19.932z" style="paint-order:normal"/><rect transform="matrix(.66428 -.74748 .74998 .66146 0 0)" x="-217.91" y="280.73" width="10.664" height="29.006" ry="0" style="paint-order:normal"/></g></g></svg>',
     
-    var divide_period = function(since, until){
-        var first_since = since = round_date(since);
-        var second_until = until = round_date(until);
-        var first_until = get_date_from_ms((first_since.getTime()+second_until.getTime())/2);
-        var second_since = first_until = round_date(first_until);
-        return {
-            first_half: {
-                since: first_since
-            ,   until: first_until
-            }
-        ,   second_half: {
-                since: second_since
-            ,   until: second_until
-            }
-        };
-    };  //  end of divide_period()
+    searching_icon_svg = '<svg version="1.1" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" fill="none" r="10" stroke-width="4" style="stroke: currentColor; opacity: 0.4;"></circle><path d="M 12,2 a 10 10 -90 0 1 9,5.6" fill="none" stroke="currentColor" stroke-width="4" />',
     
-    var get_query_date_string = function(date){
-        if (!(date instanceof Date)) date = new Date(date);
-        return date.toISOString().replace(/T([^.]+)\..*$/, '_$1_UTC');
-    };  //  end of get_date_string_for_search()
+    get_query_datetime = time_sec => new Date( time_sec * 1000 ).toISOString().replace( /T/, '_' ).replace( /(\.\d*)?Z$/, '_GMT' ),
     
-    var get_search_url = function(search_words, since, until){
-        search_words = (' '+search_words+' ').replace(/\s(?:since|until):[^\s]+/g, ' ').replace(/(^\s+|\s+$)/g, '');
-        var query = search_words;
-        if (since) query += ' since:' + get_query_date_string(since);
-        if (until) query += ' until:' + get_query_date_string(until);
-        log('q=' + query);
-        var url = 'https://twitter.com/search?f=realtime&q=' + encodeURIComponent(query);
-        return url;
-    };  //  end of get_search_url()
+    get_search_input_element = () => document.querySelector( 'div[data-testid="primaryColumn"] form[role="search"] input[data-testid="SearchBox_Search_Input"]' ),
+    is_night_mode = () => ( getComputedStyle( document.body ).backgroundColor != 'rgb(255, 255, 255)' ),
     
-    var do_search = function(search_words, target_period, callback){
-        var search_url = get_search_url(search_words, target_period.since, target_period.until);
-        target_period.search_url = search_url;
-        $.get(search_url, callback, 'html');
-        return search_url;
-    };  //  end of do_search()
-    
-    var get_tweets = function(html){
-        var links = html.match(/<a[^>]+class="[^"]*tweet-timestamp[\s\S]*?<\/a>/g);
-        if (!links) links = [];
-        var tweets = [];
-        for (var ci=0, len=links.length; ci < len; ci++) {
-            var link = links[ci];
-            tweets[tweets.length] = {
-                path: (link.match(/href="([^"]*)"/)) ? RegExp.$1 : ''
-            ,   title: (link.match(/title="([^"]*)"/)) ? RegExp.$1 : ''
-            ,   data_time: (link.match(/data-time="([^"]*)"/)) ? RegExp.$1 : ''
-            ,   data_time_ms: (link.match(/data-time-ms="([^"]*)"/)) ? RegExp.$1 : ''
+    divide_period = ( period, min_period_length_sec = 180 ) => {
+        if ( ! period ) {
+            period = {
+                from_time_sec : new Date( '2006-03-01T00:00:00Z' ).getTime() / 1000,
+                to_time_sec : Date.now() / 1000,
             };
         }
-        log(tweets);
-        return tweets;
-    };  //  end of get_tweets()
-    
-    var search_first_tweet = function(search_words, finish, debug){
-        if (debug) DEBUG = true;
-        var since = new Date('2006-03-01T00:00:00.000Z'), until = date_shift(new Date(), 1);
-        //var period_info = divide_period(since, until), target_period = period_info.first_half;
-        var period_info = null, target_period = {since: since, until: until};
         
-        var counter = 0;
-        var callback = function(html){
-            counter++;
-            log('*** callback(): count=' + counter);
-            var tweets = get_tweets(html);
-            if (tweets.length <= 0) {
-                if (!period_info || target_period !== period_info.first_half) {
-                    finish({since: null, until: null, search_url: get_search_url(search_words)}, []);
-                    return;
-                }
-                target_period = period_info.second_half;
-            }
-            else if (TERMINATE_SEARCH_THRESHOLD < tweets.length) {
-                period_info = divide_period(target_period.since, target_period.until);
-                if (period_info.first_half.until.getTime() <= period_info.first_half.since.getTime()) {
-                    finish(target_period, tweets);
-                    return;
-                }
-                target_period = period_info.first_half;
+        let from_time_sec = Math.floor( period.from_time_sec ),
+            to_time_sec = Math.floor( period.to_time_sec );
+        
+        if ( to_time_sec - min_period_length_sec <= from_time_sec ) {
+            return null;
+        }
+        
+        let middle_time_sec = Math.floor( from_time_sec + ( to_time_sec - from_time_sec ) / 2 );
+        
+        if ( ( middle_time_sec <= from_time_sec ) || ( to_time_sec <= middle_time_sec ) ) {
+            return null;
+        }
+        
+        return {
+            first_period : {
+                from_time_sec : from_time_sec,
+                to_time_sec : middle_time_sec,
+            },
+            second_period : {
+                from_time_sec : middle_time_sec,
+                to_time_sec : to_time_sec,
+            },
+        }
+    }, // end of divide_period()
+    
+    search_result_map = {},
+    
+    search_first_tweet = async ( specified_query ) => {
+        let period_info = divide_period(),
+            next_period_info,
+            try_counter = 0,
+            hit_tweet_info = null,
+            hit_period = null,
+            HitSearchTimeline,
+            query_base = specified_query;
+        
+        while ( period_info ) {
+            try_counter ++;
+            
+            log_debug(
+                'try_counter:', try_counter,
+                'period length(sec):', ( period_info.second_period.to_time_sec - period_info.first_period.from_time_sec ),
+                'period_info:', period_info,
+                'until:', new Date( period_info.first_period.to_time_sec * 1000 ).toISOString()
+            );
+            
+            let SearchTimeline = new ClassSearchTimeline( {
+                    specified_query : specified_query,
+                    max_timestamp_ms : period_info.first_period.to_time_sec * 1000 + 1,
+                } ),
+                tweet_info = await SearchTimeline.fetch_tweet_info();
+            
+            query_base = SearchTimeline.query_base;
+            
+            if ( ! query_base ) return null;
+            
+            log_debug( ( tweet_info || {} ).datetime, tweet_info );
+            
+            if ( tweet_info ) {
+                hit_tweet_info = tweet_info;
+                hit_period = period_info.first_period;
+                HitSearchTimeline = SearchTimeline;
+                next_period_info = divide_period( period_info.first_period );
             }
             else {
-                //finish(target_period, tweets);
-                var since = get_date_from_ms(tweets[tweets.length-1].data_time_ms), until = date_shift(since, 1);
-                finish({since: since, until: until, search_url: get_search_url(search_words, since, until)}, [tweets[tweets.length-1]]);
-                return;
+                next_period_info = divide_period( period_info.second_period );
             }
-            do_search(search_words, target_period, callback);
-        };
-        do_search(search_words, target_period, callback);
-        
-    };  //  end of search_first_tweet()
-    
-    var add_search_button = function(){
-        var jq_search_button = $('<li id="'+ NAME_SCRIPT + '_button"><a class="js-nav js-tooltip" href="#" data-placement="bottom" title="search for first tweet based on keywords" style="color:navy;"><span class="Icon Icon--search Icon--large"></span><span class="text"></span></a></li>');
-        var jq_link = jq_search_button.find('a');
-        jq_link.click(function(){
-            var search_words = get_selected_text() || $('input#search-query').val();
-            if (!search_words) return false;
             
-            var cwin = w.open('about:blank'), cdoc = cwin.document;
-            var html = '<html><head><title>' + NAME_SCRIPT + ': #TITLE#</title></head><body><h1 style="font-size:12px; color:darkgreen;">' + NAME_SCRIPT + '</h1><h2 style="font-size:16px;">#HEADER#</h2>#BODY#</body></html>';
-            cdoc.open();
-            cdoc.write(html.replace(/#TITLE#/g, 'Searching ...').replace(/#HEADER#/g, 'Searching ...').replace(/#BODY#/g, '<p><img src="//furyu-tei.sakura.ne.jp/icon/loading_icon.gif" alt="searching..." title="searching..." /></p>'));
-            cdoc.close();
-            search_first_tweet(search_words, function(info, tweets){
-                if (0 < tweets.length) {
-                    var tweet_htmls = [];
-                    for (var ci=tweets.length-1; 0 <= ci; ci--) {
-                        var tweet = tweets[ci];
-                        tweet_htmls[tweet_htmls.length] = '<blockquote class="twitter-tweet" lang="ja"><a href="https://twitter.com' + tweet.path + '">' + tweet.title + '</a></blockquote>';
-                    }
-                    var tweet_html = tweet_htmls.join('') + '<script async src="//platform.twitter.com/widgets.js" charset="utf-8"></script>';
+            if ( ! next_period_info ) {
+                if ( HitSearchTimeline ) {
+                    SearchTimeline = HitSearchTimeline;
                 }
                 else {
-                    var tweet_html = '<p>Not found</p>';
+                    SearchTimeline = new ClassSearchTimeline( {
+                        specified_query : specified_query,
+                        max_timestamp_ms : period_info.second_period.to_time_sec * 1000 + 1,
+                    } );
                 }
-                cdoc.open();
-                //var search_url = info.search_url;
-                var search_url = get_search_url(search_words, null, info.until);
-                cdoc.write(html.replace(/#TITLE#/g, 'Result').replace(/#HEADER#/g, '<a href="' + search_url + '" style="text-decoration:none;">Search Result</a>').replace(/#BODY#/g, tweet_html));
-                cdoc.close();
-            });
-            return false;
-        });
-        $('div.global-nav ul.nav.right-actions').prepend(jq_search_button);
-    };  //  end of add_search_button()
+                
+                while ( true ) {
+                    tweet_info = await SearchTimeline.fetch_tweet_info();
+                    if ( ! tweet_info ) break;
+                    
+                    hit_tweet_info = tweet_info;
+                }
+                break;
+            }
+            period_info = next_period_info;
+        }
+        
+        log_debug( hit_period, hit_tweet_info );
+        
+        return {
+            first_tweet_info : hit_tweet_info,
+            period : hit_period,
+            specified_query,
+            query_base,
+        };
+    },  // end of search_first_tweet()
     
-    add_search_button();
+    check_page_transition = () => {
+        let search_button = document.querySelector( '.' + SEARCH_BUTTON_CLASS );
+        
+        if ( search_button ) {
+            if ( is_night_mode() ) {
+                search_button.classList.add( 'night-mode' );
+            }
+            else {
+                search_button.classList.remove( 'night-mode' );
+            }
+            return;
+        }
+        
+        const
+            search_input = get_search_input_element();
+        
+        if ( ! search_input ) return;
+        
+        const
+            search_form = search_input.closest( 'form[role="search"]' );
+        
+        if ( ! search_form ) return;
+        
+        search_button = document.createElement( 'div' );
+        search_button.classList.add( SEARCH_BUTTON_CLASS );
+        if ( is_night_mode() ) {
+            search_button.classList.add( 'night-mode' );
+        }
+        search_button.title = SEARCH_BUTTON_HELP_TEXT;
+        
+        let search_button_icon,
+            searching_icon;
+        
+        search_button.insertAdjacentHTML( 'beforeend', searching_icon_svg );
+        searching_icon = search_button.firstChild;
+        searching_icon.remove();
+        search_button.insertAdjacentHTML( 'beforeend', search_button_icon_svg );
+        search_button_icon = search_button.firstChild;
+        
+        const
+            do_page_transition = ( url ) => {
+                if ( ! url ) return;
+                
+                if ( ENABLE_NEW_WINDOW_OPEN ) {
+                    window.open( url );
+                }
+                else {
+                    //location.href = url;
+                    // TODO: ページ読み込みを発生させないために pushState を使用しているが、Twitter側で state の構造（特に key）が変わってしまうとうまく動かなくなる
+                    // TODO: Firefox79.0 (64 ビット)＋Violentmonkey 2.12.7の場合、Twitter側のスクリプト（main*.js）にてエラーが発生する（Uncaught Error: Permission denied to access property "key"）
+                    // →とりあえず、Tampermonkey 4.11.6117 なら動作する模様
+                    let state = {
+                            key : 'r80bpk',
+                            state : {
+                                fromApp : true,
+                                previousPath : location.pathname,
+                            },
+                        },
+                        pop_state_event = new PopStateEvent( 'popstate', { state : state } );
+                    
+                    history.pushState( state, '', new URL( url ).pathname );
+                    dispatchEvent( pop_state_event );
+                }
+            };
+        
+        let is_searching = false;
+        
+        search_button.addEventListener( 'click', async ( event ) => {
+            event.preventDefault();
+            event.stopPropagation();
+            
+            if ( is_searching ) return;
+            
+            let specified_query = ( get_search_input_element() || {} ).value || ( Array.from( new URL( location.href ).searchParams ).filter( p => p[ 0 ] == 'q' )[ 0 ] || [] )[ 1 ] || '';
+            
+            if ( ! specified_query ) {
+                return;
+            }
+            
+            if ( search_result_map[ specified_query ] ) {
+                do_page_transition( ( search_result_map[ specified_query ].first_tweet_info || {} ).tweet_url );
+                return;
+            }
+            
+            is_searching = true;
+            search_button_icon.remove();
+            search_button.appendChild( searching_icon );
+            search_button.classList.add( 'searching' );
+            search_button.title = SEARCHING_HELP_TEXT;
+            
+            let result = await search_first_tweet( specified_query ) || {};
+            
+            search_result_map[ specified_query ] = result;
+            
+            if ( result && result.first_tweet_info ) {
+                do_page_transition( ( result.first_tweet_info || {} ).tweet_url );
+            }
+            
+            is_searching = false;
+            searching_icon.remove();
+            search_button.appendChild( search_button_icon );
+            search_button.classList.remove( 'searching' );
+            search_button.title = SEARCH_BUTTON_HELP_TEXT;
+        } );
+        search_form.after( search_button );
+    }, // end of check_page_transition()
     
-}   //  end of main()
+    insert_css_rule = () => {
+        const
+            button_selector = '.' + SEARCH_BUTTON_CLASS,
+            css_rule_text = `
+                ${button_selector} {
+                    position: absolute;
+                    right: -28px;
+                    bottom: 2px;
+                    display: inline-block;
+                    width: 28px;
+                    height: 28px;
+                    background: transparent;
+                    color: #8899a6;
+                    cursor: pointer;
+                }
+                
+                ${button_selector}:hover {
+                    color: #17bf63;
+                }
+                
+                ${button_selector}.night-mode {
+                }
+                
+                ${button_selector}.searching svg {
+                    animation: searching 1.5s linear infinite;
+                }
+                
+                @keyframes searching {
+                    0% {transform: rotate(0deg);}
+                    100% {transform: rotate(360deg);}
+                }
+            `;
+        
+        let css_style = document.querySelector( '.' + CSS_STYLE_CLASS );
+        
+        if ( css_style ) css_style.remove();
+        
+        css_style = document.createElement( 'style' );
+        css_style.classList.add( CSS_STYLE_CLASS );
+        css_style.textContent = css_rule_text;
+        
+        document.querySelector( 'head' ).appendChild( css_style );
+    }, // end of insert_css_rule()
+    
+    observer = new MutationObserver( ( records ) => {
+        try {
+            stop_observe();
+            check_page_transition();
+        }
+        finally {
+            start_observe();
+        }
+    } ),
+    start_observe = () => observer.observe( document.body, { childList : true, subtree : true } ),
+    stop_observe = () => observer.disconnect();
 
+insert_css_rule();
+start_observe();
 
-if (typeof w.$ == 'function') {
-    main(w, d);
-}
-else {
-    var container = d.documentElement;
-    var scripts = d.querySelectorAll('script[nonce]');
-    var nonce = (0 < scripts.length) ? scripts[0].getAttribute('nonce') : null;
-    var script = d.createElement('script');
-    if (nonce) {script.setAttribute('nonce', nonce);}
-    script.textContent = '('+main.toString()+')(window, document);';
-    container.appendChild(script);
-}
-
-})(window, document);
-
-// ■ end of file
+} )();
