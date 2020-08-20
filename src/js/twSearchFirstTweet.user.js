@@ -3,7 +3,7 @@
 // @name:ja         最初のツイート検索
 // @namespace       https://furyutei.work
 // @license         MIT
-// @version         0.2.0
+// @version         0.2.1
 // @description     Search the first tweet related to a specific keyword in search timeline of Twitter
 // @description:ja  Twitterの検索タイムラインにおいて指定したキーワードに関する最初のツイートを検索
 // @author          furyu
@@ -49,6 +49,7 @@ const
     ClassSearchTimeline = CLASS_TIMELINE_SET[ TIMELINE_TYPE.search ],
     
     SEARCH_BUTTON_HELP_TEXT = 'Search for the first tweet that contains a given keyword',
+    SEARCH_BUTTON_USER_HELP_TEXT = 'Search for the first tweet by this user',
     SEARCHING_HELP_TEXT = 'Searching ...',
     
     search_button_icon_svg = '<svg version="1.1" viewBox="0 0 96 96" xmlns="http://www.w3.org/2000/svg"><g transform="translate(0 -271.6)"><g transform="matrix(1.0127 0 0 .94178 5.2473 -23.213)" aria-label="1" fill="currentColor"><path d="m60.319 382.71h-36.204v-6.2296h14.175v-46.768h-14.175v-5.5074q8.3062-0.0451 11.872-2.3474 3.5663-2.3474 4.0177-7.4034h6.4102v62.026h13.904z"/></g><g fill="currentColor"><path d="m40.125 291.81a32.75 32.75 0 0 0-24.875 31.789 32.75 32.75 0 0 0 32.75 32.75 32.75 32.75 0 0 0 32.75-32.75 32.75 32.75 0 0 0-24.875-31.789v11.859a21 21.5 0 0 1 13.125 19.93 21 21.5 0 0 1-0.9082 6.25h2.9961v8.75h-8.0449a21 21.5 0 0 1-15.043 6.5 21 21.5 0 0 1-15.043-6.5h-8.0449v-8.75h2.9941a21 21.5 0 0 1-0.90625-6.25 21 21.5 0 0 1 13.125-19.932z" style="paint-order:normal"/><rect transform="matrix(.66428 -.74748 .74998 .66146 0 0)" x="-217.91" y="280.73" width="10.664" height="29.006" ry="0" style="paint-order:normal"/></g></g></svg>',
@@ -58,6 +59,9 @@ const
     get_query_datetime = time_sec => new Date( time_sec * 1000 ).toISOString().replace( /T/, '_' ).replace( /(\.\d*)?Z$/, '_GMT' ),
     
     get_search_input_element = () => document.querySelector( 'div[data-testid="primaryColumn"] form[role="search"] input[data-testid="SearchBox_Search_Input"]' ),
+    
+    get_screen_name_from_url = ( url ) => new URL( url || location.href ).pathname.split( '/', 2 )[ 1 ],
+    
     is_night_mode = () => ( getComputedStyle( document.body ).backgroundColor != 'rgb(255, 255, 255)' ),
     
     divide_period = ( period, min_period_length_sec = 180 ) => {
@@ -182,21 +186,34 @@ const
         }
         
         const
-            search_input = get_search_input_element();
+            search_form = ( () => {
+                const
+                    search_input = get_search_input_element();
+                if ( ! search_input ) return null;
+                return search_input.closest( 'form[role="search"]' );
+            } )(),
+            
+            user_profile_header_items_container = document.querySelector( 'div[data-testid="primaryColumn"] [data-testid="UserProfileHeader_Items"]' ),
+            
+            base_container = search_form || ( user_profile_header_items_container || {} ).lastChild;
         
-        if ( ! search_input ) return;
-        
-        const
-            search_form = search_input.closest( 'form[role="search"]' );
-        
-        if ( ! search_form ) return;
+        if ( ! base_container ) return;
         
         search_button = document.createElement( 'div' );
         search_button.classList.add( SEARCH_BUTTON_CLASS );
+        
+        if ( search_form ) {
+            search_button.classList.add( 'search-timeline' );
+            search_button.title = SEARCH_BUTTON_HELP_TEXT;
+        }
+        else {
+            search_button.classList.add( 'user-timeline' );
+            search_button.title = SEARCH_BUTTON_USER_HELP_TEXT;
+        }
+        
         if ( is_night_mode() ) {
             search_button.classList.add( 'night-mode' );
         }
-        search_button.title = SEARCH_BUTTON_HELP_TEXT;
         
         let search_button_icon,
             searching_icon;
@@ -241,7 +258,14 @@ const
             
             if ( is_searching ) return;
             
-            let specified_query = ( get_search_input_element() || {} ).value || ( Array.from( new URL( location.href ).searchParams ).filter( p => p[ 0 ] == 'q' )[ 0 ] || [] )[ 1 ] || '';
+            let specified_query = ( () => {
+                    if ( search_form ) {
+                        return ( get_search_input_element() || {} ).value || ( Array.from( new URL( location.href ).searchParams ).filter( p => p[ 0 ] == 'q' )[ 0 ] || [] )[ 1 ] || '';
+                    }
+                    else {
+                        return 'from:' + get_screen_name_from_url();
+                    }
+                } ) ();
             
             if ( ! specified_query ) {
                 return;
@@ -272,7 +296,19 @@ const
             search_button.classList.remove( 'searching' );
             search_button.title = SEARCH_BUTTON_HELP_TEXT;
         } );
-        search_form.after( search_button );
+        
+        base_container.after( search_button );
+        
+        if ( user_profile_header_items_container ) {
+            let first_link = user_profile_header_items_container.querySelector( ':scope > a' );
+            
+            if ( first_link ) {
+                let br = document.createElement( 'br' );
+                
+                br.classList.add( 'after-linefeed' );
+                first_link.after( br );
+            }
+        }
     }, // end of check_page_transition()
     
     insert_css_rule = () => {
@@ -280,9 +316,6 @@ const
             button_selector = '.' + SEARCH_BUTTON_CLASS,
             css_rule_text = `
                 ${button_selector} {
-                    position: absolute;
-                    right: -28px;
-                    bottom: 2px;
                     display: inline-block;
                     width: 28px;
                     height: 28px;
@@ -291,11 +324,20 @@ const
                     cursor: pointer;
                 }
                 
-                ${button_selector}:hover {
-                    color: #17bf63;
+                ${button_selector}.search-timeline {
+                    position: absolute;
+                    bottom: 2px;
+                    right: -28px;
                 }
                 
-                ${button_selector}.night-mode {
+                ${button_selector}.user-timeline {
+                    position: relative;
+                    top: 8px;
+                    left: 8px;
+                }
+                
+                ${button_selector}:hover {
+                    color: #17bf63;
                 }
                 
                 ${button_selector}.searching svg {
@@ -305,6 +347,9 @@ const
                 @keyframes searching {
                     0% {transform: rotate(0deg);}
                     100% {transform: rotate(360deg);}
+                }
+                
+                ${button_selector}.night-mode {
                 }
             `;
         
