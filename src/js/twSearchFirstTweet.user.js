@@ -3,7 +3,7 @@
 // @name:ja         最初のツイート検索
 // @namespace       https://furyutei.work
 // @license         MIT
-// @version         0.2.2
+// @version         0.2.3
 // @description     Search the first tweet related to a specific keyword in search timeline of Twitter
 // @description:ja  Twitterの検索タイムラインにおいて指定したキーワードに関する最初のツイートを検索
 // @author          furyu
@@ -28,6 +28,7 @@ const
     CSS_STYLE_CLASS = SCRIPT_NAME + '-css-rule',
     
     ENABLE_NEW_WINDOW_OPEN = false, // TODO: 検索後に新しいウィンドウを開こうとするとポップアップブロックに引っかかってしまう
+    EXCLUDE_RETWEETS = true, // true: リツイートは除外して検索
     
     TwitterTimeline = ( ( TwitterTimeline ) => {
         TwitterTimeline.debug_mode = DEBUG;
@@ -45,6 +46,7 @@ const
         log_error,
         TWITTER_API,
         TIMELINE_TYPE,
+        REACTION_TYPE,
         CLASS_TIMELINE_SET,
     } = TwitterTimeline,
     
@@ -68,12 +70,10 @@ const
     is_night_mode = () => ( getComputedStyle( document.body ).backgroundColor != 'rgb(255, 255, 255)' ),
     
     divide_period = ( period, min_period_length_sec = 180 ) => {
-        if ( ! period ) {
-            period = {
-                from_time_sec : new Date( '2006-03-01T00:00:00Z' ).getTime() / 1000,
-                to_time_sec : Date.now() / 1000,
-            };
-        }
+        period = period || {};
+        
+        if ( ! period.from_time_sec ) period.from_time_sec = new Date( '2006-03-01T00:00:00Z' ).getTime() / 1000;
+        if ( ! period.to_time_sec ) period.to_time_sec = Date.now() / 1000;
         
         let from_time_sec = Math.floor( period.from_time_sec ),
             to_time_sec = Math.floor( period.to_time_sec );
@@ -113,7 +113,24 @@ const
             return;
         }
         
-        let period_info = divide_period(),
+        const
+            get_valid_tweet_info = async ( SearchTimeline ) => {
+                let tweet_info;
+                
+                while ( true ) {
+                    tweet_info = await SearchTimeline.fetch_tweet_info();
+                    if ( ! tweet_info ) break;
+                    if ( ! EXCLUDE_RETWEETS ) break;
+                    if ( tweet_info.reacted_info && ( tweet_info.reacted_info.type == REACTION_TYPE.retweet ) ) {
+                        continue; // RTの場合は読み飛ばす
+                    }
+                    break;
+                }
+                return tweet_info;
+            };
+        
+        let user_info = screen_name ? await TWITTER_API.get_user_info( { screen_name } ) : null,
+            period_info = divide_period( user_info ? { from_time_sec : new Date( user_info.created_at ).getTime() / 1000 } : null ),
             next_period_info,
             try_counter = 0,
             hit_tweet_info = null,
@@ -135,12 +152,13 @@ const
                     screen_name,
                     specified_query,
                     max_timestamp_ms : period_info.first_period.to_time_sec * 1000 + 1,
-                } ),
-                tweet_info = await SearchTimeline.fetch_tweet_info();
+                } );
             
             query_base = SearchTimeline.query_base;
             
             if ( ! query_base ) return null;
+            
+            let tweet_info = await get_valid_tweet_info( SearchTimeline );
             
             log_debug( ( tweet_info || {} ).datetime, tweet_info );
             
@@ -167,7 +185,8 @@ const
                 }
                 
                 while ( true ) {
-                    tweet_info = await SearchTimeline.fetch_tweet_info();
+                    tweet_info = await get_valid_tweet_info( SearchTimeline );
+                    
                     if ( ! tweet_info ) break;
                     
                     hit_tweet_info = tweet_info;
