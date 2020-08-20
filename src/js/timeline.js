@@ -1572,6 +1572,14 @@ const
                 screen_name = self.screen_name = parameters.screen_name;
             
             if ( ( ! max_tweet_id ) && ( max_timestamp_ms ) ) {
+                max_tweet_id = self.max_tweet_id = convert_utc_msec_to_tweet_id( max_timestamp_ms );
+                
+                if ( max_tweet_id === ID_THRESHOLD ) {
+                    max_tweet_id = self.max_tweet_id = null;
+                }
+            }
+            
+            if ( ! max_tweet_id ) {
                 self.api_type_in_use = API_TYPE_IN_USE.search;
             }
             
