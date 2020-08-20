@@ -3,7 +3,7 @@
 // @name:ja         最初のツイート検索
 // @namespace       https://furyutei.work
 // @license         MIT
-// @version         0.2.1
+// @version         0.2.2
 // @description     Search the first tweet related to a specific keyword in search timeline of Twitter
 // @description:ja  Twitterの検索タイムラインにおいて指定したキーワードに関する最初のツイートを検索
 // @author          furyu
@@ -32,7 +32,9 @@ const
     TwitterTimeline = ( ( TwitterTimeline ) => {
         TwitterTimeline.debug_mode = DEBUG;
         TwitterTimeline.logged_script_name = SCRIPT_NAME;
-        TwitterTimeline.TWITTER_API.API_DEFINITIONS[ TwitterTimeline.TIMELINE_TYPE.search ].min_delay_ms = 1; // デフォルトではディレイが入るのでこれを無効化
+        // デフォルトでは Rate Limit 回避用にディレイが入るので、これを無効化
+        TwitterTimeline.TWITTER_API.API_DEFINITIONS[ TwitterTimeline.TIMELINE_TYPE.user ].min_delay_ms = 1;
+        TwitterTimeline.TWITTER_API.API_DEFINITIONS[ TwitterTimeline.TIMELINE_TYPE.search ].min_delay_ms = 1;
         return TwitterTimeline;
     } )( window.TwitterTimeline ),
     
@@ -46,6 +48,7 @@ const
         CLASS_TIMELINE_SET,
     } = TwitterTimeline,
     
+    ClassUserTimeline = CLASS_TIMELINE_SET[ TIMELINE_TYPE.user ],
     ClassSearchTimeline = CLASS_TIMELINE_SET[ TIMELINE_TYPE.search ],
     
     SEARCH_BUTTON_HELP_TEXT = 'Search for the first tweet that contains a given keyword',
@@ -99,7 +102,17 @@ const
     
     search_result_map = {},
     
-    search_first_tweet = async ( specified_query ) => {
+    search_first_tweet = async ( parameters ) => {
+        parameters = parameters || {};
+        
+        const
+            { specified_query, screen_name } = parameters,
+            ClassTimeline = screen_name ? ClassUserTimeline : ( specified_query ? ClassSearchTimeline : null );
+        
+        if ( ! ClassTimeline ) {
+            return;
+        }
+        
         let period_info = divide_period(),
             next_period_info,
             try_counter = 0,
@@ -118,8 +131,9 @@ const
                 'until:', new Date( period_info.first_period.to_time_sec * 1000 ).toISOString()
             );
             
-            let SearchTimeline = new ClassSearchTimeline( {
-                    specified_query : specified_query,
+            let SearchTimeline = new ClassTimeline( {
+                    screen_name,
+                    specified_query,
                     max_timestamp_ms : period_info.first_period.to_time_sec * 1000 + 1,
                 } ),
                 tweet_info = await SearchTimeline.fetch_tweet_info();
@@ -145,8 +159,9 @@ const
                     SearchTimeline = HitSearchTimeline;
                 }
                 else {
-                    SearchTimeline = new ClassSearchTimeline( {
-                        specified_query : specified_query,
+                    SearchTimeline = new ClassTimeline( {
+                        screen_name,
+                        specified_query,
                         max_timestamp_ms : period_info.second_period.to_time_sec * 1000 + 1,
                     } );
                 }
@@ -167,6 +182,7 @@ const
         return {
             first_tweet_info : hit_tweet_info,
             period : hit_period,
+            screen_name,
             specified_query,
             query_base,
         };
@@ -258,14 +274,8 @@ const
             
             if ( is_searching ) return;
             
-            let specified_query = ( () => {
-                    if ( search_form ) {
-                        return ( get_search_input_element() || {} ).value || ( Array.from( new URL( location.href ).searchParams ).filter( p => p[ 0 ] == 'q' )[ 0 ] || [] )[ 1 ] || '';
-                    }
-                    else {
-                        return 'from:' + get_screen_name_from_url();
-                    }
-                } ) ();
+            let screen_name = search_form ? null : get_screen_name_from_url(),
+                specified_query = search_form ? ( ( get_search_input_element() || {} ).value || ( Array.from( new URL( location.href ).searchParams ).filter( p => p[ 0 ] == 'q' )[ 0 ] || [] )[ 1 ] || '' ) : 'from:' + screen_name;
             
             if ( ! specified_query ) {
                 return;
@@ -282,7 +292,8 @@ const
             search_button.classList.add( 'searching' );
             search_button.title = SEARCHING_HELP_TEXT;
             
-            let result = await search_first_tweet( specified_query ) || {};
+            let result = await search_first_tweet( { specified_query, screen_name } ) || {};
+            log_debug( 'search_first_tweet() result:', result );
             
             search_result_map[ specified_query ] = result;
             
