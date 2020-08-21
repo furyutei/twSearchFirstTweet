@@ -265,12 +265,12 @@ const
                 HitSearchTimeline = SearchTimeline;
                 next_period_info = divide_period( period_info.first_period );
                 
-                log_info( '[in this period]', period_info.first_period, 'period_length:', period_length, '(sec) => found ! tweet_info:', tweet_info, 'next_period_info:', next_period_info, 'SearchTimeline:', SearchTimeline );
+                log_debug( '[in this period]', period_info.first_period, 'period_length:', period_length, '(sec) => found ! tweet_info:', tweet_info, 'next_period_info:', next_period_info, 'SearchTimeline:', SearchTimeline );
             }
             else {
                 next_period_info = divide_period( period_info.second_period );
                 
-                log_info( '[in this period]', period_info.first_period, 'period_length:', period_length, '(sec) => no tweet ... next_period_info:', next_period_info, 'SearchTimeline:', SearchTimeline );
+                log_debug( '[in this period]', period_info.first_period, 'period_length:', period_length, '(sec) => no tweet ... next_period_info:', next_period_info, 'SearchTimeline:', SearchTimeline );
             }
             
             if ( ! next_period_info ) {
