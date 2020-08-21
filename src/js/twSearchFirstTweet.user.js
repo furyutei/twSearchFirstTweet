@@ -3,7 +3,7 @@
 // @name:ja         最初のツイート検索
 // @namespace       https://furyutei.work
 // @license         MIT
-// @version         0.2.3
+// @version         0.2.4
 // @description     Search the first tweet related to a specific keyword in search timeline of Twitter
 // @description:ja  Twitterの検索タイムラインにおいて指定したキーワードに関する最初のツイートを検索
 // @author          furyu
@@ -29,6 +29,7 @@ const
     
     ENABLE_NEW_WINDOW_OPEN = false, // TODO: 検索後に新しいウィンドウを開こうとするとポップアップブロックに引っかかってしまう
     EXCLUDE_RETWEETS = true, // true: リツイートは除外して検索
+    TIME_TO_REASSESS_USER_FIRST_TWEET_MSEC = 24 * 60 * 60 * 1000, // ユーザーの最初のツイートを再評価するまでの時間（ミリ秒）
     
     TwitterTimeline = ( ( TwitterTimeline ) => {
         TwitterTimeline.debug_mode = DEBUG;
@@ -69,6 +70,47 @@ const
     
     is_night_mode = () => ( getComputedStyle( document.body ).backgroundColor != 'rgb(255, 255, 255)' ),
     
+    save_value = async ( name, value ) => {
+        localStorage.setItem( SCRIPT_NAME + '-' + name, value );
+    }, // end of save_value()
+    
+    load_value = async ( name ) => {
+        return localStorage.getItem( SCRIPT_NAME + '-' + name );
+    }, // end of load_value()
+    
+    load_user_tweet_info_map = async () => {
+        try {
+            let user_tweet_info_map_string = await load_value( 'UserTweetInfoMap' );
+            
+            if ( ! user_tweet_info_map_string ) return {};
+            
+            let user_tweet_info_map = JSON.parse( user_tweet_info_map_string );
+            
+            log_debug( 'load_user_tweet_info_map() user_tweet_info_map:', user_tweet_info_map );
+            
+            return user_tweet_info_map;
+        }
+        catch ( error ) {
+            log_error( 'load_user_tweet_info_map() error:', error );
+            return {};
+        }
+    }, // end of load_user_tweet_info_map()
+    
+    save_user_tweet_info_map = async ( user_tweet_info_map ) => {
+        try {
+            let user_tweet_info_map_string = JSON.stringify( user_tweet_info_map );
+            
+            await save_value( 'UserTweetInfoMap', user_tweet_info_map_string );
+        }
+        catch ( error ) {
+            log_error( 'save_user_tweet_info_map() error:', error );
+        }
+    }, // end of save_user_tweet_info_map()
+    
+    user_tweet_info_map = await load_user_tweet_info_map() || {}, // Twitterのユーザーの情報のうち、変化しないユーザーID(id_str)をキーに情報を保存
+    
+    search_result_map = {},
+    
     divide_period = ( period, min_period_length_sec = 180 ) => {
         period = period || {};
         
@@ -100,8 +142,6 @@ const
         }
     }, // end of divide_period()
     
-    search_result_map = {},
-    
     search_first_tweet = async ( parameters ) => {
         parameters = parameters || {};
         
@@ -110,7 +150,14 @@ const
             ClassTimeline = screen_name ? ClassUserTimeline : ( specified_query ? ClassSearchTimeline : null );
         
         if ( ! ClassTimeline ) {
-            return;
+            return null;
+        }
+        
+        let user_info = screen_name ? await TWITTER_API.get_user_info( { screen_name } ) : {},
+            user_id = screen_name ? user_info.id_str : null;
+        
+        if ( screen_name && ( ! user_id ) ) {
+            return null;
         }
         
         const
@@ -129,8 +176,56 @@ const
                 return tweet_info;
             };
         
-        let user_info = screen_name ? await TWITTER_API.get_user_info( { screen_name } ) : null,
-            period_info = divide_period( user_info ? { from_time_sec : new Date( user_info.created_at ).getTime() / 1000 } : null ),
+        let user_tweet_info = user_id ? ( user_tweet_info_map[ user_id ] || {} ) : {},
+            
+            period_info = ( () => {
+                if ( ! user_id ) {
+                    return divide_period();
+                }
+                
+                if ( ! user_tweet_info.first_tweet_url ) {
+                    return divide_period( {
+                        from_time_sec : new Date( user_info.created_at ).getTime() / 1000,
+                    } );
+                }
+                
+                let current_timestamp_ms = Date.now();
+                
+                try {
+                    if ( ( ! user_tweet_info.reassess_timstamp_ms ) || ( user_tweet_info.reassess_timstamp_ms < current_timestamp_ms ) ) {
+                        // 一定期間経過後は、ツイートを再チェック
+                        user_tweet_info.reassess_timstamp_ms = null;
+                        
+                        return {
+                            first_period : {
+                                from_time_sec : Math.floor( new Date( user_info.created_at ).getTime() / 1000 ),
+                                to_time_sec : user_tweet_info.period.to_time_sec,
+                            },
+                            second_period : {
+                                from_time_sec : user_tweet_info.period.to_time_sec,
+                                to_time_sec : Math.floor( current_timestamp_ms / 1000 ),
+                           }
+                        };
+                    }
+                    else {
+                        // キャッシュ時間内は保存された period を使用
+                        return {
+                            first_period : user_tweet_info.period,
+                            second_period : {
+                                from_time_sec : user_tweet_info.period.to_time_sec,
+                                to_time_sec : Math.floor( current_timestamp_ms / 1000 ),
+                           }
+                        };
+                   }
+                }
+                catch ( error ) {
+                    log_error( 'Illegal format in user_tweet_info:', user_tweet_info, error );
+                    
+                    return divide_period( {
+                        from_time_sec : new Date( user_info.created_at ).getTime() / 1000,
+                    } );
+                }
+            } )(),
             next_period_info,
             try_counter = 0,
             hit_tweet_info = null,
@@ -141,9 +236,11 @@ const
         while ( period_info ) {
             try_counter ++;
             
+            let period_length = period_info.first_period.to_time_sec - period_info.first_period.from_time_sec;
+            
             log_debug(
                 'try_counter:', try_counter,
-                'period length(sec):', ( period_info.second_period.to_time_sec - period_info.first_period.from_time_sec ),
+                'period length(sec):', period_length,
                 'period_info:', period_info,
                 'until:', new Date( period_info.first_period.to_time_sec * 1000 ).toISOString()
             );
@@ -167,9 +264,13 @@ const
                 hit_period = period_info.first_period;
                 HitSearchTimeline = SearchTimeline;
                 next_period_info = divide_period( period_info.first_period );
+                
+                log_info( '[in this period]', period_info.first_period, 'period_length:', period_length, '(sec) => found ! tweet_info:', tweet_info, 'next_period_info:', next_period_info, 'SearchTimeline:', SearchTimeline );
             }
             else {
                 next_period_info = divide_period( period_info.second_period );
+                
+                log_info( '[in this period]', period_info.first_period, 'period_length:', period_length, '(sec) => no tweet ... next_period_info:', next_period_info, 'SearchTimeline:', SearchTimeline );
             }
             
             if ( ! next_period_info ) {
@@ -177,10 +278,11 @@ const
                     SearchTimeline = HitSearchTimeline;
                 }
                 else {
+                    hit_period = period_info.second_period;
                     SearchTimeline = new ClassTimeline( {
                         screen_name,
                         specified_query,
-                        max_timestamp_ms : period_info.second_period.to_time_sec * 1000 + 1,
+                        max_timestamp_ms : hit_period.to_time_sec * 1000 + 1,
                     } );
                 }
                 
@@ -191,20 +293,43 @@ const
                     
                     hit_tweet_info = tweet_info;
                 }
+                
+                if ( hit_tweet_info ) {
+                    hit_period.from_time_sec = Math.floor( hit_tweet_info.timestamp_ms / 1000 );
+                }
+                else {
+                    hit_period = null;
+                }
                 break;
             }
             period_info = next_period_info;
         }
         
-        log_debug( hit_period, hit_tweet_info );
+        let result = {
+                first_tweet_info : hit_tweet_info,
+                period : hit_period,
+                screen_name,
+                user_id,
+                specified_query,
+                query_base,
+            };
         
-        return {
-            first_tweet_info : hit_tweet_info,
-            period : hit_period,
-            screen_name,
-            specified_query,
-            query_base,
-        };
+        if ( user_id ) {
+            user_tweet_info_map[ user_id ] = {
+                user_id,
+                screen_name,
+                first_tweet_url : ( hit_tweet_info || {} ).tweet_url,
+                first_tweet_timestamp_ms : ( hit_tweet_info || {} ).timestamp_ms,
+                period : hit_period,
+                reassess_timstamp_ms : user_tweet_info.reassess_timstamp_ms || ( Date.now() + TIME_TO_REASSESS_USER_FIRST_TWEET_MSEC ),
+            }
+            await save_user_tweet_info_map( user_tweet_info_map );
+            
+            log_debug( 'updated user_tweet_info_map:', user_tweet_info_map );
+        }
+        log_debug( 'result:', result );
+        
+        return result;
     },  // end of search_first_tweet()
     
     check_page_transition = () => {
@@ -217,6 +342,15 @@ const
             else {
                 search_button.classList.remove( 'night-mode' );
             }
+            
+            let br = search_button.parentNode.querySelector( '.before-linefeed' ),
+                previous_element = search_button.previousSibling;
+            
+            if ( ( ! br ) || ( ! previous_element ) ) return;
+            if ( previous_element.previousSibling && previous_element.previousSibling.classList.contains( 'before-linefeed' ) ) return;
+            
+            log_debug( 're-insert br.before-linefeed' );
+            previous_element.before( br );
             return;
         }
         
@@ -330,14 +464,10 @@ const
         base_container.after( search_button );
         
         if ( user_profile_header_items_container ) {
-            let first_link = user_profile_header_items_container.querySelector( ':scope > a' );
-            
-            if ( first_link ) {
-                let br = document.createElement( 'br' );
-                
-                br.classList.add( 'after-linefeed' );
-                first_link.after( br );
-            }
+            // 「xxxx年xx月からTwitterを利用しています」の前に改行を挿入
+            let br = document.createElement( 'br' );
+            br.classList.add( 'before-linefeed' );
+            ( search_button.previousSibling || search_button ).before( br );
         }
     }, // end of check_page_transition()
     
@@ -380,6 +510,10 @@ const
                 }
                 
                 ${button_selector}.night-mode {
+                }
+                
+                br.before-linefeed:first-child {
+                    display: none;
                 }
             `;
         
