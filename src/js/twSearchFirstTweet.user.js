@@ -3,7 +3,7 @@
 // @name:ja         最初のツイート検索
 // @namespace       https://furyutei.work
 // @license         MIT
-// @version         0.2.4
+// @version         0.2.5
 // @description     Search the first tweet related to a specific keyword in search timeline of Twitter
 // @description:ja  Twitterの検索タイムラインにおいて指定したキーワードに関する最初のツイートを検索
 // @author          furyu
@@ -249,6 +249,7 @@ const
                     screen_name,
                     specified_query,
                     max_timestamp_ms : period_info.first_period.to_time_sec * 1000 + 1,
+                    keep_since : true,
                 } );
             
             query_base = SearchTimeline.query_base;
@@ -283,6 +284,7 @@ const
                         screen_name,
                         specified_query,
                         max_timestamp_ms : hit_period.to_time_sec * 1000 + 1,
+                        keep_since : true,
                     } );
                 }
                 
