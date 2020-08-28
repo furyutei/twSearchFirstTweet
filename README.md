@@ -1,6 +1,7 @@
-twSearchFirstTweet
-==================
-Twitter上でキーワードを含む最初のツイートを検索するユーザースクリプト
+[最初のツイート検索（twSearchFirstTweet）](https://github.com/furyutei/twSearchFirstTweet)
+===
+
+Twitter上でキーワードを含む最初のツイートを検索するユーザースクリプト  
 
 - License: The MIT license  
 - Copyright (c) 2014-2020 風柳(furyu)  

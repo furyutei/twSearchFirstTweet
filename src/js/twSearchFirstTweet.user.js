@@ -3,14 +3,14 @@
 // @name:ja         最初のツイート検索
 // @namespace       https://furyutei.work
 // @license         MIT
-// @version         0.2.5
+// @version         0.2.6
 // @description     Search the first tweet related to a specific keyword in search timeline of Twitter
 // @description:ja  Twitterの検索タイムラインにおいて指定したキーワードに関する最初のツイートを検索
 // @author          furyu
 // @match           https://twitter.com/*
 // @match           https://mobile.twitter.com/*
 // @grant           none
-// @require         http://furyutei.github.io/twSearchFirstTweet/src/js/timeline.js
+// @require         https://greasyfork.org/scripts/410119-twittertimeline/code/TwitterTimeline.js?version=842193
 // @compatible      chrome
 // @compatible      firefox
 // @supportURL      https://github.com/furyutei/twSearchFirstTweet/issues
