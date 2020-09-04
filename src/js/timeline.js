@@ -454,28 +454,28 @@ const
                 API_DEFINITIONS : {
                     [ TIMELINE_TYPE.user ] : {
                         url_template : 'https://api.twitter.com/1.1/statuses/user_timeline.json?count=#COUNT#&include_my_retweet=1&include_rts=1&cards_platform=Web-13&include_entities=1&include_user_entities=1&include_cards=1&send_error_codes=1&tweet_mode=extended&include_ext_alt_text=true&include_reply_count=true',
-                        tweet_number : { default : 20, limit : 40 },
+                        tweet_number : { default : 20, limit : 200 },
                         min_delay_ms : self.TWITTER_API_DELAY_SHORT,
                         max_retry : 3,
                     },
                     
                     [ TIMELINE_TYPE.search ] : {
                         url_template : 'https://api.twitter.com/1.1/search/universal.json?q=#QUERY#&count=#COUNT#&modules=status&result_type=recent&pc=false&cards_platform=Web-13&include_entities=1&include_user_entities=1&include_cards=1&send_error_codes=1&tweet_mode=extended&include_ext_alt_text=true&include_reply_count=true',
-                        tweet_number : { default : 20, limit : 40 },
+                        tweet_number : { default : 20, limit : 100 },
                         min_delay_ms : self.TWITTER_API_DELAY_SHORT,
                         max_retry : 3,
                     },
                     
                     [ TIMELINE_TYPE.notifications ] : {
                         url_template : 'https://api.twitter.com/1.1/activity/about_me.json?model_version=7&count=#COUNT#&skip_aggregation=true&cards_platform=Web-13&include_entities=1&include_user_entities=1&include_cards=1&send_error_codes=1&tweet_mode=extended&include_ext_alt_text=true&include_reply_count=true',
-                        tweet_number : { default : 20, limit : 40 },
+                        tweet_number : { default : 20, limit : 200 },
                         min_delay_ms : self.TWITTER_API_DELAY_LONG,
                         max_retry : 3,
                     },
                     
                     [ TIMELINE_TYPE.likes_legacy ] : {
                         url_template : 'https://api.twitter.com/1.1/favorites/list.json?count=#COUNT#&include_my_retweet=1&cards_platform=Web-13&include_entities=1&include_user_entities=1&include_cards=1&send_error_codes=1&tweet_mode=extended&include_ext_alt_text=true&include_reply_count=true',
-                        tweet_number : { default : 20, limit : 40 },
+                        tweet_number : { default : 20, limit : 200 },
                         min_delay_ms : self.TWITTER_API_DELAY_VERY_LONG,
                         max_retry : 3,
                     },
