@@ -3,7 +3,7 @@
 // @name:ja         最初のツイート検索
 // @namespace       https://furyutei.work
 // @license         MIT
-// @version         0.2.6
+// @version         0.2.7
 // @description     Search the first tweet related to a specific keyword in search timeline of Twitter
 // @description:ja  Twitterの検索タイムラインにおいて指定したキーワードに関する最初のツイートを検索
 // @author          furyu
